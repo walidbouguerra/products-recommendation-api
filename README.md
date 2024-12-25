@@ -1,7 +1,7 @@
 
 # Products Recommendation API
 
-API qui liste des produits en fonction de la météo d'une ville ciblée.
+API that lists products based on the weather of a targeted city.
 
 ## Table of Contents
 1. [Installation](#installation)
