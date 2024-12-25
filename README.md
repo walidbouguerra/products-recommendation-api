@@ -29,7 +29,6 @@ cd products-recommendation-api
 
 3. Install dependencies:
 ```
-cd products-recommendation-api
 composer install
 ```
 
