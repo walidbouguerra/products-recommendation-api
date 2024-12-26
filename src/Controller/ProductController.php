@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\DTO\WeatherRequest;
 use App\Repository\ProductRepository;
 use App\Service\WeatherService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -11,6 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ProductController extends AbstractController
 {
@@ -25,34 +27,39 @@ class ProductController extends AbstractController
      * @return JsonResponse The JSON response containing the products and weather information.
      */
     #[Route('/api/products', name: 'product.products', methods: ['POST'])]
-    public function getProducts(Request $request, WeatherService $weatherService, ProductRepository $productRepository, SerializerInterface $serializer): JsonResponse
-    {
+    public function getProducts(
+        Request $request, 
+        WeatherService $weatherService, 
+        ProductRepository $productRepository, 
+        SerializerInterface $serializer,
+        ValidatorInterface $validator
+    ): JsonResponse {
         // Decode the incoming JSON request content
         $data = json_decode($request->getContent(), true);
       
-        // Validate that the data is an array
-        if (!is_array($data)) {
-            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Invalid JSON format.');
-        }
+        // Initialize the WeatherRequest DTO
+        $weatherRequest = new WeatherRequest();
+        $weatherRequest->setCity($data['weather']['city'] ?? '');
+        $weatherRequest->setDate($data['date'] ?? 'today');
 
-        // Check for required 'weather' field
-        if (!isset($data['weather']) || !is_array($data['weather'])) {
-            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'weather field is missing.');
-        }
+        // Determine the appropriate validation group based on the type of date
+        $validationGroups = is_numeric($weatherRequest->getDate()) ? ['numeric'] : ['string'];
 
-        // Ensure the 'city' field is provided within 'weather'
-        if (!isset($data['weather']['city']) || empty($data['weather']['city'])) {
-            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'city field is missing.');
-        }
+        // Validate the DTO
+        $errors = $validator->validate($weatherRequest, null, $validationGroups);
 
-        // Get the city and date from the request, defaulting to 'today' if no date is provided
-        $city = $data['weather']['city'];
-        $date = $data['date'] ?? 'today';
+        // If there are validation errors, return them
+        if (count($errors) > 0) {
+            $errorMessages = [];
+                foreach ($errors as $error) {
+                    $errorMessages[] = $error->getMessage();
+                }
+                throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, implode(', ', $errorMessages));
+            }
 
-         // Validate the date parameter (today, tomorrow, or 1-14)
-         if (!in_array($date, ['today', 'tomorrow'], true) && (!is_numeric($date) || $date < 1 || $date > 14)) {
-            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Invalid date parameter. Use "today", "tomorrow", or a number between 1 and 14.');
-        }
+        // Use the DTO to retrieve the city and the date
+        $city = $weatherRequest->getCity();
+        $date = $weatherRequest->getDate();
 
         // Retrieve temperature data from the WeatherService
         $temperature = $weatherService->getTemperature($city, $date);
