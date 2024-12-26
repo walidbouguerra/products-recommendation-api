@@ -47,7 +47,12 @@ class ProductController extends AbstractController
 
         // Get the city and date from the request, defaulting to 'today' if no date is provided
         $city = $data['weather']['city'];
-        $date = $data['date'] ?? 'today'; 
+        $date = $data['date'] ?? 'today';
+
+         // Validate the date parameter (today, tomorrow, or 1-14)
+         if (!in_array($date, ['today', 'tomorrow'], true) && (!is_numeric($date) || $date < 1 || $date > 14)) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Invalid date parameter. Use "today", "tomorrow", or a number between 1 and 14.');
+        }
 
         // Retrieve temperature data from the WeatherService
         $temperature = $weatherService->getTemperature($city, $date);

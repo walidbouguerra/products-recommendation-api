@@ -20,13 +20,25 @@ class WeatherService
      * Get the temperature for a specific city and date.
      * 
      * @param string $city The city to get the weather for.
-     * @param string|null $date The date to get the weather for, can be 'today' or 'tomorrow'.
+     * @param string|int $date The date to get the weather for, can be 'today', 'tomorrow' or a number between 1 and 14.
      * @return float|null The average temperature in Celsius or null if there was an error.
      */
-    public function getTemperature(string $city, ?string $date): ?float
+    public function getTemperature(string $city, $date): ?float
     {
         // Attempt to fetch the weather data
         try {
+            // Determine the correct `days` parameter based on the input
+            $days = match ($date) {
+                'today' => 1,
+                'tomorrow' => 2,
+                default => (is_numeric($date) && $date >= 1 && $date <= 14) ? $date : null
+            };
+
+            // If days is invalid, return null
+            if ($days === null) {
+                return null;
+            }
+
             // Prepare the API request with query parameters
             $response = $this->client->request(
                 'GET',
@@ -34,7 +46,7 @@ class WeatherService
                     'query' => [
                         'key' => $this->weatherApiKey,
                         'q' => $city,
-                        'days' => ($date === 'today') ? 1 : 2, // Fetch weather for today or tomorrow
+                        'days' => $days,
                         'lang' => 'fr'
                     ]
                 ]
@@ -44,8 +56,10 @@ class WeatherService
             if ($response->getStatusCode() === 200) {
                 // Parse the response into an associative array
                 $data = $response->toArray();
+                // Find the correct forecast day index (0 for today, 1 for tomorrow, etc.)
+                $forecastIndex = ($days - 1); // Adjust for 0-based index
                 // Return the average temperature based on the date provided
-                return $data['forecast']['forecastday'][($date === 'today') ? 0 : 1]['day']['avgtemp_c'];
+                return $data['forecast']['forecastday'][$forecastIndex]['day']['avgtemp_c'];
             }
 
         } catch (TransportExceptionInterface $e) {
