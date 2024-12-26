@@ -60,13 +60,13 @@ class ProductController extends AbstractController
         // Determine the product type based on the temperature
         if ($temperature < 10) {
             $products = $productRepository->findByType(1);  // Pull products
-            $is = 'cold'; 
+            $weather = ['city' => $city, 'is' => 'cold', 'date' => $date];
         } elseif ($temperature <= 20) {
             $products = $productRepository->findByType(2);  // Sweat products
-            $is = 'warm';
+            $weather = ['city' => $city, 'is' => 'warm', 'date' => $date];
         } else {
             $products = $productRepository->findByType(3);  // T-Shirt products
-            $is = 'hot';
+            $weather = ['city' => $city, 'is' => 'hot', 'date' => $date];
         }
         
         // Serialize the products to JSON
@@ -75,11 +75,7 @@ class ProductController extends AbstractController
         // Prepare the response data
         $response = [
             'products' => json_decode($serializedProducts),
-            'weather' => [
-                'city' => $city,
-                'is' => $is ?? null,
-                'date' => $date,
-            ]
+            'weather' => $weather,
         ];
 
         // Return the response as JSON
