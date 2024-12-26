@@ -3,6 +3,7 @@
 namespace App\Tests;
 
 use App\Service\WeatherService;
+use App\Repository\ProductRepository;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class ProductControllerTest extends WebTestCase
@@ -10,17 +11,20 @@ class ProductControllerTest extends WebTestCase
     private const URL = '/api/products';
     private $client;
     private $weatherService;
+    private $productRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Create the client and mock WeatherService
+        // Create the client and mock WeatherService and ProductRepository
         $this->client = static::createClient();
         $this->weatherService = $this->createMock(WeatherService::class);
+        $this->productRepository = $this->createMock(ProductRepository::class);
 
-        // Inject the mock service
+        // Inject the mock services
         $this->client->getContainer()->set(WeatherService::class, $this->weatherService);
+        $this->client->getContainer()->set(ProductRepository::class, $this->productRepository);
     }
 
     public function testGetProductsValidRequest(): void
@@ -33,6 +37,7 @@ class ProductControllerTest extends WebTestCase
 
         // Mock WeatherService response
         $this->weatherService->method('getTemperature')->willReturn(25.0);
+        $this->productRepository->method('findByType')->willReturn([['name' => 'T-Shirt']]);
 
         $this->client->request('POST', self::URL, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
 
@@ -53,6 +58,10 @@ class ProductControllerTest extends WebTestCase
         $this->client->request('POST', self::URL, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($invalidData));
 
         $this->assertResponseStatusCodeSame(400);
+        $this->assertJson($this->client->getResponse()->getContent());
+
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertStringContainsString('City is required', $responseData['message']);
     }
 
     public function testGetProductsWithoutDate(): void
@@ -63,6 +72,7 @@ class ProductControllerTest extends WebTestCase
         ];
 
         $this->weatherService->method('getTemperature')->willReturn(25.0);
+        $this->productRepository->method('findByType')->willReturn([['name' => 'T-Shirt']]);
 
         $this->client->request('POST', self::URL, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
 
@@ -84,7 +94,7 @@ class ProductControllerTest extends WebTestCase
         $this->assertJson($this->client->getResponse()->getContent());
 
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertEquals('city field is missing.', $responseData['message']);
+        $this->assertEquals('City is required.', $responseData['message']);
     }
 
     public function testGetProductsTemperatureError(): void
@@ -101,5 +111,22 @@ class ProductControllerTest extends WebTestCase
 
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertEquals('Failed to retrieve temperature data.', $responseData['message']);
+    }
+
+    public function testGetProductsInvalidDate(): void
+    {
+        // Invalid date (not 'today' or 'tomorrow', or out of numeric range)
+        $data = [
+            'weather' => ['city' => 'Marseille'],
+            'date' => 20, // Invalid date, should be between 1 and 14 for numeric
+        ];
+
+        $this->client->request('POST', self::URL, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+
+        $this->assertResponseStatusCodeSame(400);
+        $this->assertJson($this->client->getResponse()->getContent());
+
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertStringContainsString('Date must be between 1 and 14 if numeric', $responseData['message']);
     }
 }
